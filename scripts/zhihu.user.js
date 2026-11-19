@@ -99,14 +99,25 @@
     .Sticky,
     /* 右侧无用栏清理 */
     .GlobalSideBar,
+    .GlobalSideBar *,
     .QuestionHeader-side,
     .QuestionSide,
     .Topstory-sideBar,
     .SideBar,
     .Recommendation,
     .CornerButtons,
+    .CreatorEntrance,
+    .HotSearchCard,
+    .HotSearch,
     .KfeCollection-ArticleTopCard,
-    .KfeCollection-PcCollegeBar {
+    .KfeCollection-PcCollegeBar,
+    .KfeCollection-PcCreatorEntrance,
+    /* 页脚清理 */
+    footer,
+    .Footer,
+    .ZhihuFooter,
+    .footer,
+    .Copyright {
         display: none !important;
     }
 
@@ -123,11 +134,24 @@
         -webkit-text-fill-color: currentColor !important;
     }
 
-    /* 主内容区自适应宽度（右侧栏清掉后利用空间） */
+    /* 主内容区铺满可用宽度（右侧栏清掉后不再留大片空白） */
     .App-main {
-        width: auto !important;
-        max-width: 1100px !important;
-        margin: 0 auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 32px !important;
+        box-sizing: border-box !important;
+    }
+
+    #root .Topstory-mainColumn,
+    #root .Question-mainColumn,
+    #root .Question-main,
+    #root .MainColumn,
+    #root .List {
+        width: 100% !important;
+        max-width: none !important;
+        flex: 1 1 auto !important;
+        box-sizing: border-box !important;
     }
 
     #root .Card,
@@ -166,6 +190,52 @@
     #root h1, #root h2, #root h3 {
         color: #ffffff !important;
         font-family: "Menlo", "Monaco", "Consolas", ui-monospace, monospace !important;
+        font-weight: 400 !important;
+    }
+
+    /* ---------- 列表排版：加大留白、放松行距 ---------- */
+    #root .List-item,
+    #root .TopstoryItem {
+        padding: 20px 24px !important;
+        margin-bottom: 14px !important;
+        line-height: 1.8 !important;
+    }
+
+    /* 内层内容项不再重复加内边距，避免双层 padding */
+    #root .ContentItem {
+        padding: 0 !important;
+        line-height: 1.8 !important;
+    }
+
+    #root .List-item,
+    #root .TopstoryItem,
+    #root .ContentItem,
+    #root .ContentItem-title,
+    #root .QuestionItem-title,
+    #root .ContentItem-meta,
+    #root .AuthorInfo-name {
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif !important;
+        letter-spacing: .01em !important;
+    }
+
+    #root .ContentItem-title,
+    #root .QuestionItem-title {
+        font-size: 17px !important;
+        font-weight: 400 !important;
+        line-height: 1.65 !important;
+        margin-bottom: 8px !important;
+        color: #e0e0e0 !important;
+    }
+
+    /* 标题内部的 span / b 也不加粗 */
+    #root .ContentItem-title *,
+    #root .QuestionItem-title * {
+        font-weight: 400 !important;
+    }
+
+    #root .ContentItem-meta {
+        font-size: 14px !important;
+        line-height: 1.8 !important;
     }
 
     /* ---------- 正文 ---------- */
@@ -176,7 +246,17 @@
     #root .Post-RichText p {
         color: ${COLORS.text} !important;
         font-family: "Menlo", "Monaco", "Consolas", ui-monospace, monospace !important;
-        line-height: 1.75 !important;
+        font-size: 15px !important;
+        line-height: 1.9 !important;
+        letter-spacing: .01em !important;
+    }
+
+    #root .RichText p {
+        margin-bottom: 14px !important;
+    }
+
+    #root .RichText img {
+        margin: 10px 0 !important;
     }
 
     #root a,
@@ -811,12 +891,57 @@
             .replace(/'/g, '&#39;');
     }
 
+    /* ===================== 清理无用区块 ===================== */
+    // 右侧栏、页脚等区域知乎类名经常变，用关键词做兜底清理
+    const NOISE_KEYWORDS = [
+        '创作中心', '草稿箱', '今日阅读', '今日新增赞同数', '进入创作中心',
+        '等你来答', '大家都在搜', '换一换',
+        '盐言作者平台', '付费咨询', '知乎知学堂',
+        '推荐关注', '帮助中心', '服务热线', '举报中心',
+        '违法和不良信息举报',
+    ];
+
+    let cleaning = false;
+
+    function cleanupNoise() {
+        if (cleaning) return;
+        cleaning = true;
+        try {
+            // 1. 已知容器整块移除
+            document.querySelectorAll(
+                '.GlobalSideBar, .CreatorEntrance, .HotSearchCard, .Recommendation, ' +
+                '.KfeCollection-ArticleTopCard, .KfeCollection-PcCollegeBar, ' +
+                '.KfeCollection-PcCreatorEntrance, footer, .Footer, .ZhihuFooter, .Copyright'
+            ).forEach((el) => el.remove());
+
+            // 2. 文本兜底：右侧栏/卡片/页脚里命中关键词且不含正文的区块
+            const scope = document.querySelector('#root');
+            if (!scope) return;
+
+            scope.querySelectorAll('div, aside, section, footer').forEach((el) => {
+                if (!el.isConnected) return;
+                if (el.children.length > 12) return;
+                if (!el.matches('.Pc-card, .Card, aside, footer, [class*="SideBar"], [class*="Card"]')) return;
+
+                const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!text || text.length > 300) return;
+                if (!NOISE_KEYWORDS.some((k) => text.includes(k))) return;
+                if (el.querySelector('.RichText, .AnswerItem, .ContentItem, .QuestionHeader, .Post-RichText')) return;
+
+                el.remove();
+            });
+        } finally {
+            cleaning = false;
+        }
+    }
+
     /* ===================== 路由/内容变化监听 ===================== */
     function watchChanges() {
         let timer = null;
         const observer = new MutationObserver(() => {
             clearTimeout(timer);
             timer = setTimeout(() => {
+                cleanupNoise();
                 updateTabTitle();
                 renderOutline();
             }, 700);
@@ -827,9 +952,15 @@
         const rawPush = history.pushState;
         history.pushState = function () {
             rawPush.apply(this, arguments);
-            setTimeout(renderOutline, 500);
+            setTimeout(() => {
+                cleanupNoise();
+                renderOutline();
+            }, 500);
         };
-        window.addEventListener('popstate', () => setTimeout(renderOutline, 500));
+        window.addEventListener('popstate', () => setTimeout(() => {
+            cleanupNoise();
+            renderOutline();
+        }, 500));
     }
 
     /* ===================== 启动 ===================== */
@@ -838,6 +969,7 @@
 
         addStyle(CSS);
         buildShell();
+        cleanupNoise();
         bindEvents();
         renderOutline();
         watchChanges();
