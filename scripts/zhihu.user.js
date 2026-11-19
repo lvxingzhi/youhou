@@ -94,12 +94,19 @@
 
     /* ---------- 知乎原生导航隐藏 ---------- */
     .AppHeader,
+    .AppHeader-inner,
+    .MobileAppHeader,
     .Sticky,
+    /* 右侧无用栏清理 */
     .GlobalSideBar,
     .QuestionHeader-side,
-    .Topstory-tabCard,
-    .AppHeader-inner,
-    .MobileAppHeader {
+    .QuestionSide,
+    .Topstory-sideBar,
+    .SideBar,
+    .Recommendation,
+    .CornerButtons,
+    .KfeCollection-ArticleTopCard,
+    .KfeCollection-PcCollegeBar {
         display: none !important;
     }
 
@@ -108,99 +115,126 @@
         background: ${COLORS.bg} !important;
     }
 
-    .Card,
-    .List-item,
-    .TopstoryItem,
-    .AnswerItem,
-    .ContentItem,
-    .QuestionHeader,
-    .Post-content {
-        background: ${COLORS.bgAlt} !important;
+    /* 兜底：内容区所有元素透明背景 + 浅色文字，彻底消灭白底与黑字 */
+    #root, #root * {
+        background-image: none !important;
+        background-color: transparent !important;
+        color: ${COLORS.text} !important;
+        -webkit-text-fill-color: currentColor !important;
+    }
+
+    /* 主内容区自适应宽度（右侧栏清掉后利用空间） */
+    .App-main {
+        width: auto !important;
+        max-width: 1100px !important;
+        margin: 0 auto !important;
+    }
+
+    #root .Card,
+    #root .List-item,
+    #root .TopstoryItem,
+    #root .AnswerItem,
+    #root .ContentItem,
+    #root .QuestionHeader,
+    #root .Post-content {
+        background-color: ${COLORS.bgAlt} !important;
         border: 1px solid ${COLORS.border} !important;
         border-radius: 0 !important;
         box-shadow: none !important;
-        color: ${COLORS.text} !important;
     }
 
-    .QuestionHeader {
+    /* 首页顶部"关注 / 推荐 / 热榜"标签卡 */
+    #root .Topstory-tabCard,
+    #root .Tabs {
+        background-color: ${COLORS.bgAlt} !important;
+        border: 1px solid ${COLORS.border} !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        margin-top: 8px !important;
+    }
+
+    #root .QuestionHeader {
         border-left: none !important;
         border-right: none !important;
         border-top: none !important;
     }
 
-    .QuestionHeader-title,
-    .ContentItem-title,
-    .Post-Title,
-    .QuestionRichText-title,
-    h1, h2, h3 {
-        color: ${COLORS.text} !important;
+    #root .QuestionHeader-title,
+    #root .ContentItem-title,
+    #root .Post-Title,
+    #root .QuestionRichText-title,
+    #root h1, #root h2, #root h3 {
+        color: #ffffff !important;
         font-family: "Menlo", "Monaco", "Consolas", ui-monospace, monospace !important;
     }
 
     /* ---------- 正文 ---------- */
-    .RichText,
-    .RichText p,
-    .RichText li,
-    .Post-RichText,
-    .Post-RichText p {
+    #root .RichText,
+    #root .RichText p,
+    #root .RichText li,
+    #root .Post-RichText,
+    #root .Post-RichText p {
         color: ${COLORS.text} !important;
         font-family: "Menlo", "Monaco", "Consolas", ui-monospace, monospace !important;
         line-height: 1.75 !important;
     }
 
-    .RichText a,
-    .Post-RichText a,
-    .ContentItem-meta a {
+    #root a,
+    #root .RichText a,
+    #root .Post-RichText a,
+    #root .ContentItem-meta a {
         color: ${COLORS.link} !important;
     }
 
-    .RichText blockquote {
+    #root .RichText blockquote {
         border-left: 3px solid ${COLORS.accent} !important;
-        background: #1a1a1a !important;
+        background-color: #1a1a1a !important;
         color: #a0a0a0 !important;
         margin: 12px 0 !important;
         padding: 8px 16px !important;
     }
 
-    .RichText pre,
-    .RichText code,
-    .highlight {
-        background: #0d0d0d !important;
+    #root .RichText pre,
+    #root .RichText code,
+    #root .highlight {
+        background-color: #0d0d0d !important;
         border: 1px solid ${COLORS.border} !important;
         color: ${COLORS.orange} !important;
         border-radius: 0 !important;
         font-family: "Menlo", "Monaco", "Consolas", ui-monospace, monospace !important;
     }
 
-    .RichText img, .Post-RichText img {
+    #root .RichText img,
+    #root .Post-RichText img {
         border: 1px solid ${COLORS.border};
         border-radius: 0;
     }
 
     /* ---------- 交互组件 ---------- */
-    .VoteButton,
-    .Button--blue {
-        background: ${COLORS.accent} !important;
+    #root .VoteButton,
+    #root .Button--blue {
+        background-color: ${COLORS.accent} !important;
         border-color: ${COLORS.accent} !important;
         border-radius: 0 !important;
+        color: #ffffff !important;
     }
 
-    .VoteButton--down,
-    .Button {
-        background: #2d2d2d !important;
+    #root .VoteButton--down,
+    #root .Button {
+        background-color: #2d2d2d !important;
         border: 1px solid ${COLORS.border} !important;
         color: ${COLORS.text} !important;
         border-radius: 0 !important;
     }
 
-    .AuthorInfo-name,
-    .UserLink-link {
+    #root .AuthorInfo-name,
+    #root .UserLink-link {
         color: ${COLORS.green} !important;
     }
 
-    .ContentItem-meta,
-    .RichContent-collapsedText,
-    .Button--plain {
+    #root .ContentItem-meta,
+    #root .RichContent-collapsedText,
+    #root .Button--plain {
         color: ${COLORS.muted} !important;
     }
 
@@ -262,6 +296,36 @@
     #vsc-tabs .vsc-tab-title {
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* ---------- 顶部导航（首页 / 关注 / 热榜 / 推荐） ---------- */
+    #vsc-nav {
+        display: flex;
+        align-items: stretch;
+        flex-shrink: 0;
+        border-right: 1px solid ${COLORS.border};
+    }
+
+    #vsc-nav a {
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        color: ${COLORS.muted} !important;
+        text-decoration: none !important;
+        white-space: nowrap;
+        border-right: 1px solid ${COLORS.border};
+        background: transparent !important;
+    }
+
+    #vsc-nav a:hover {
+        background: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+
+    #vsc-nav a.active {
+        background: ${COLORS.tabActive} !important;
+        color: #ffffff !important;
+        box-shadow: inset 0 1px 0 ${COLORS.accent};
     }
 
     /* ---------- 活动栏 ---------- */
@@ -440,6 +504,12 @@
         const tabs = document.createElement('div');
         tabs.id = 'vsc-tabs';
         tabs.innerHTML = `
+            <nav id="vsc-nav">
+                <a href="/" data-nav="home">首页</a>
+                <a href="/follow" data-nav="follow">关注</a>
+                <a href="/hot" data-nav="hot">热榜</a>
+                <a href="/recommend" data-nav="recommend">推荐</a>
+            </nav>
             <div class="vsc-tab active" data-tab="page">
                 <span class="vsc-dot"></span>
                 <span class="vsc-tab-title">知乎</span>
@@ -598,6 +668,21 @@
             const isQuestion = !!document.querySelector('.QuestionHeader, .AnswerItem');
             lang.textContent = isQuestion ? '{ } Q&A' : '{ } Markdown';
         }
+
+        updateNavActive();
+    }
+
+    function updateNavActive() {
+        const path = location.pathname;
+        document.querySelectorAll('#vsc-nav a').forEach((a) => {
+            const nav = a.dataset.nav;
+            let active = false;
+            if (nav === 'home') active = path === '/' || path === '/index';
+            else if (nav === 'follow') active = path.startsWith('/follow');
+            else if (nav === 'hot') active = path.startsWith('/hot');
+            else if (nav === 'recommend') active = path.startsWith('/recommend');
+            a.classList.toggle('active', active);
+        });
     }
 
     function setActive(index) {
