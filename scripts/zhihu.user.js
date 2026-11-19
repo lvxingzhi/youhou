@@ -299,6 +299,33 @@
         border-radius: 0;
     }
 
+    /* ---------- 图片折叠 ---------- */
+    #root .vsc-img-hidden {
+        display: none !important;
+    }
+
+    #root .vsc-img-toggle {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-width: 200px;
+        padding: 10px 18px !important;
+        margin: 8px 0 !important;
+        background-color: #2d2d2d !important;
+        border: 1px dashed #555555 !important;
+        color: #858585 !important;
+        font-size: 13px !important;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+        cursor: pointer;
+        border-radius: 0 !important;
+    }
+
+    #root .vsc-img-toggle:hover {
+        background-color: #37373d !important;
+        border-color: ${COLORS.accent} !important;
+        color: ${COLORS.text} !important;
+    }
+
     /* ---------- 交互组件 ---------- */
     #root .VoteButton,
     #root .Button--blue {
@@ -966,6 +993,54 @@
         }
     }
 
+    /* ===================== 图片折叠 ===================== */
+    // 列表和详情里的大图默认隐藏，在原位置放"点击显示图片"按钮
+    function setupImages() {
+        const root = document.querySelector('#root');
+        if (!root) return;
+
+        root.querySelectorAll('img').forEach((img) => {
+            if (img.closest('[id^="vsc-"]')) return;
+            if (img.dataset.vscShown) return;
+            if (img.dataset.vscImgHandled) return;
+
+            // 跳过头像、图标、表情等小图
+            if (img.matches('.Avatar, .AuthorInfo-avatar, .UserLink-avatar')) return;
+            if (img.closest('.AppHeader, .AuthorInfo-avatar, .UserLink-avatar')) return;
+
+            const rect = img.getBoundingClientRect();
+            const width = rect.width || img.width || 0;
+            const height = rect.height || img.height || 0;
+            if (width < 120 && height < 120) return;
+
+            img.dataset.vscImgHandled = '1';
+            img.classList.add('vsc-img-hidden');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'vsc-img-toggle';
+            btn.textContent = '点击显示图片';
+
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                // 优先使用知乎懒加载的真实地址
+                const realSrc = img.dataset.original || img.dataset.actualsrc || img.dataset.src;
+                if (realSrc) img.src = realSrc;
+
+                img.dataset.vscShown = '1';
+                img.classList.remove('vsc-img-hidden');
+                btn.remove();
+            });
+
+            const parent = img.parentElement;
+            if (parent) {
+                parent.insertBefore(btn, img.nextSibling);
+            }
+        });
+    }
+
     /* ===================== 强制拉宽主内容列 ===================== */
     // 知乎各页面容器类名不同，按布局特征兜底：宽度像主列、位置靠上、高度足够
     function forceWiden() {
@@ -1003,6 +1078,7 @@
             timer = setTimeout(() => {
                 cleanupNoise();
                 forceWiden();
+                setupImages();
                 updateTabTitle();
                 renderOutline();
             }, 700);
@@ -1016,6 +1092,7 @@
             setTimeout(() => {
                 cleanupNoise();
                 forceWiden();
+                setupImages();
                 renderOutline();
             }, 500);
         };
@@ -1036,6 +1113,7 @@
         buildShell();
         cleanupNoise();
         forceWiden();
+        setupImages();
         bindEvents();
         renderOutline();
         watchChanges();
