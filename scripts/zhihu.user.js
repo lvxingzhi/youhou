@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         知乎 → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.1.0
+// @version      0.2.0
 // @description  把知乎网页改造成 VS Code 深色编辑器界面：活动栏 + 回答目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://www.zhihu.com/*
@@ -658,6 +658,7 @@
         `;
 
         // 状态栏
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.2.0';
         const statusbar = document.createElement('div');
         statusbar.id = 'vsc-statusbar';
         statusbar.innerHTML = `
@@ -666,6 +667,7 @@
                 <span class="vsc-status-item" id="vsc-status-count">0 条目</span>
             </div>
             <div class="vsc-status-right">
+                <span class="vsc-status-item" id="vsc-status-ver">v${version}</span>
                 <span class="vsc-status-item">Ln 1, Col 1</span>
                 <span class="vsc-status-item">空格: 2</span>
                 <span class="vsc-status-item">UTF-8</span>
@@ -996,7 +998,7 @@
     /* ===================== 图片折叠 ===================== */
     // 列表和详情里的大图默认隐藏，在原位置放"点击显示图片"按钮
     function setupImages() {
-        const root = document.querySelector('#root');
+        const root = document.querySelector('#root') || document.body;
         if (!root) return;
 
         root.querySelectorAll('img').forEach((img) => {
@@ -1009,9 +1011,21 @@
             if (img.closest('.AppHeader, .AuthorInfo-avatar, .UserLink-avatar')) return;
 
             const rect = img.getBoundingClientRect();
-            const width = rect.width || img.width || 0;
-            const height = rect.height || img.height || 0;
-            if (width < 120 && height < 120) return;
+            const rawWidth = Number(img.dataset.rawwidth || 0);
+            const rawHeight = Number(img.dataset.rawheight || 0);
+            const width = rect.width || img.width || rawWidth || 0;
+            const height = rect.height || img.height || rawHeight || 0;
+
+            // 尺寸未知（懒加载未完成）：等 load 后再重试
+            if (!width && !height) {
+                if (!img.complete) {
+                    img.addEventListener('load', () => setupImages(), { once: true });
+                }
+                return;
+            }
+
+            // 小图（头像、表情、图标）跳过
+            if (width < 60 && height < 60) return;
 
             img.dataset.vscImgHandled = '1';
             img.classList.add('vsc-img-hidden');
