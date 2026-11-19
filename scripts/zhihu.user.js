@@ -126,12 +126,14 @@
         background: ${COLORS.bg} !important;
     }
 
-    /* 兜底：内容区所有元素透明背景 + 浅色文字，彻底消灭白底与黑字 */
+    /* 兜底：内容区所有元素透明背景 + 浅色文字 + 常规字重，彻底消灭白底、黑字、加粗与高亮 */
     #root, #root * {
         background-image: none !important;
         background-color: transparent !important;
         color: ${COLORS.text} !important;
         -webkit-text-fill-color: currentColor !important;
+        font-weight: 400 !important;
+        text-shadow: none !important;
     }
 
     /* 主内容区铺满可用宽度（右侧栏清掉后不再留大片空白） */
@@ -147,6 +149,13 @@
     #root .Question-mainColumn,
     #root .Question-main,
     #root .MainColumn,
+    #root .HotList,
+    #root .HotList-list,
+    #root .HotList-main,
+    #root .HotList-content,
+    #root [class*="mainColumn"],
+    #root [class*="MainColumn"],
+    #root [class*="HotList"],
     #root .List {
         width: 100% !important;
         max-width: none !important;
@@ -898,7 +907,7 @@
         '等你来答', '大家都在搜', '换一换',
         '盐言作者平台', '付费咨询', '知乎知学堂',
         '推荐关注', '帮助中心', '服务热线', '举报中心',
-        '违法和不良信息举报',
+        '违法和不良信息举报', '关于知乎', '知乎个人信息保护指引', '京ICP',
     ];
 
     let cleaning = false;
@@ -911,28 +920,79 @@
             document.querySelectorAll(
                 '.GlobalSideBar, .CreatorEntrance, .HotSearchCard, .Recommendation, ' +
                 '.KfeCollection-ArticleTopCard, .KfeCollection-PcCollegeBar, ' +
-                '.KfeCollection-PcCreatorEntrance, footer, .Footer, .ZhihuFooter, .Copyright'
+                '.KfeCollection-PcCreatorEntrance, .CornerButtons'
             ).forEach((el) => el.remove());
 
-            // 2. 文本兜底：右侧栏/卡片/页脚里命中关键词且不含正文的区块
-            const scope = document.querySelector('#root');
-            if (!scope) return;
-
-            scope.querySelectorAll('div, aside, section, footer').forEach((el) => {
+            // 2. 页脚：不依赖标签名，按 ICP / 举报文案定位
+            document.querySelectorAll('footer, .Footer, .ZhihuFooter, .footer, div').forEach((el) => {
                 if (!el.isConnected) return;
-                if (el.children.length > 12) return;
-                if (!el.matches('.Pc-card, .Card, aside, footer, [class*="SideBar"], [class*="Card"]')) return;
+                if (el.closest('[id^="vsc-"]')) return;
 
-                const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-                if (!text || text.length > 300) return;
-                if (!NOISE_KEYWORDS.some((k) => text.includes(k))) return;
-                if (el.querySelector('.RichText, .AnswerItem, .ContentItem, .QuestionHeader, .Post-RichText')) return;
+                const text = el.textContent || '';
+                if (!text.includes('京ICP') && !text.includes('举报中心')) return;
+                if (text.length > 4000) return;
+                if (el.querySelector('.RichText, .AnswerItem, .QuestionHeader, .Post-RichText')) return;
 
                 el.remove();
             });
+
+            // 3. 文本兜底：窄容器 + 命中关键词 + 不含正文
+            const scope = document.querySelector('#root') || document.querySelector('.App') || document.body;
+            if (!scope) return;
+
+            const candidates = [];
+            scope.querySelectorAll('div, aside, section').forEach((el) => {
+                if (!el.isConnected) return;
+                if (el.closest('[id^="vsc-"]')) return;
+
+                const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!text || text.length > 4000) return;
+                if (!NOISE_KEYWORDS.some((k) => text.includes(k))) return;
+                if (el.querySelector('.RichText, .AnswerItem, .QuestionHeader, .Post-RichText, .ContentItem')) return;
+
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.width > 1600) return;
+
+                candidates.push(el);
+            });
+
+            // 只删命中的最外层容器，子元素随父一起移除
+            const topCandidates = candidates.filter(
+                (el) => !candidates.some((other) => other !== el && other.contains(el))
+            );
+            topCandidates.forEach((el) => el.remove());
         } finally {
             cleaning = false;
         }
+    }
+
+    /* ===================== 强制拉宽主内容列 ===================== */
+    // 知乎各页面容器类名不同，按布局特征兜底：宽度像主列、位置靠上、高度足够
+    function forceWiden() {
+        const root = document.querySelector('#root');
+        if (!root) return;
+
+        const targets = [];
+        root.querySelectorAll('div, main, section').forEach((el) => {
+            if (el.closest('[id^="vsc-"]')) return;
+
+            const rect = el.getBoundingClientRect();
+            if (rect.width < 500 || rect.width > 1200) return;
+            if (rect.height < 200) return;
+            if (rect.top > 500) return;
+
+            targets.push(el);
+        });
+
+        targets.forEach((el) => {
+            let node = el;
+            // 向上 4 层一起放开宽度，避免父级固定宽度卡住
+            for (let i = 0; i < 4 && node && node !== document.body; i += 1) {
+                node.style.setProperty('width', '100%', 'important');
+                node.style.setProperty('max-width', 'none', 'important');
+                node = node.parentElement;
+            }
+        });
     }
 
     /* ===================== 路由/内容变化监听 ===================== */
@@ -942,6 +1002,7 @@
             clearTimeout(timer);
             timer = setTimeout(() => {
                 cleanupNoise();
+                forceWiden();
                 updateTabTitle();
                 renderOutline();
             }, 700);
@@ -954,13 +1015,17 @@
             rawPush.apply(this, arguments);
             setTimeout(() => {
                 cleanupNoise();
+                forceWiden();
                 renderOutline();
             }, 500);
         };
         window.addEventListener('popstate', () => setTimeout(() => {
             cleanupNoise();
+            forceWiden();
             renderOutline();
         }, 500));
+
+        window.addEventListener('resize', forceWiden, { passive: true });
     }
 
     /* ===================== 启动 ===================== */
@@ -970,6 +1035,7 @@
         addStyle(CSS);
         buildShell();
         cleanupNoise();
+        forceWiden();
         bindEvents();
         renderOutline();
         watchChanges();
