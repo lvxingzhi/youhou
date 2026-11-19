@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         知乎 → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.2.0
+// @version      0.3.0
 // @description  把知乎网页改造成 VS Code 深色编辑器界面：活动栏 + 回答目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://www.zhihu.com/*
@@ -133,6 +133,13 @@
         color: ${COLORS.text} !important;
         -webkit-text-fill-color: currentColor !important;
         font-weight: 400 !important;
+        text-shadow: none !important;
+    }
+
+    /* 伪元素里的背景图（部分缩略图用 ::before/::after 实现）也一并去掉 */
+    #root *::before,
+    #root *::after {
+        background-image: none !important;
         text-shadow: none !important;
     }
 
@@ -658,13 +665,14 @@
         `;
 
         // 状态栏
-        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.2.0';
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.3.0';
         const statusbar = document.createElement('div');
         statusbar.id = 'vsc-statusbar';
         statusbar.innerHTML = `
             <div class="vsc-status-left">
                 <span class="vsc-status-item" id="vsc-status-branch">⑂ main</span>
                 <span class="vsc-status-item" id="vsc-status-count">0 条目</span>
+                <span class="vsc-status-item" id="vsc-status-img">0 图已折叠</span>
             </div>
             <div class="vsc-status-right">
                 <span class="vsc-status-item" id="vsc-status-ver">v${version}</span>
@@ -1006,9 +1014,12 @@
             if (img.dataset.vscShown) return;
             if (img.dataset.vscImgHandled) return;
 
-            // 跳过头像、图标、表情等小图
+            // 跳过头像、图标、表情
             if (img.matches('.Avatar, .AuthorInfo-avatar, .UserLink-avatar')) return;
-            if (img.closest('.AppHeader, .AuthorInfo-avatar, .UserLink-avatar')) return;
+            if (img.closest('.Avatar, .AuthorInfo, .UserLink, .AppHeader, [class*="avatar"], [class*="Avatar"]')) return;
+
+            const src = img.currentSrc || img.src || '';
+            if (/avatar|emoji|expression|icon|logo|badge|qrcode/i.test(src)) return;
 
             const rect = img.getBoundingClientRect();
             const rawWidth = Number(img.dataset.rawwidth || 0);
@@ -1016,16 +1027,22 @@
             const width = rect.width || img.width || rawWidth || 0;
             const height = rect.height || img.height || rawHeight || 0;
 
-            // 尺寸未知（懒加载未完成）：等 load 后再重试
+            // 尺寸未知（懒加载未完成 / 容器暂无高度）：稍后重试
             if (!width && !height) {
                 if (!img.complete) {
                     img.addEventListener('load', () => setupImages(), { once: true });
+                    return;
+                }
+                const retry = Number(img.dataset.vscImgRetry || 0);
+                if (retry < 3) {
+                    img.dataset.vscImgRetry = String(retry + 1);
+                    setTimeout(setupImages, 600);
                 }
                 return;
             }
 
-            // 小图（头像、表情、图标）跳过
-            if (width < 60 && height < 60) return;
+            // 只排除极小图标，热榜缩略图等内容图一律折叠
+            if (width < 20 && height < 20) return;
 
             img.dataset.vscImgHandled = '1';
             img.classList.add('vsc-img-hidden');
@@ -1053,6 +1070,13 @@
                 parent.insertBefore(btn, img.nextSibling);
             }
         });
+
+        // 状态栏显示折叠数量，便于确认功能是否运行
+        const imgStatus = document.getElementById('vsc-status-img');
+        if (imgStatus) {
+            const hiddenCount = root.querySelectorAll('.vsc-img-hidden').length;
+            imgStatus.textContent = `${hiddenCount} 图已折叠`;
+        }
     }
 
     /* ===================== 强制拉宽主内容列 ===================== */
