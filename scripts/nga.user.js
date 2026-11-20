@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NGA → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.1.0
+// @version      0.2.0
 // @description  把 NGA 论坛改造成 VS Code 深色编辑器界面：活动栏 + 楼层目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://bbs.nga.cn/*
@@ -120,6 +120,23 @@
         background: ${COLORS.bg} !important;
     }
 
+    /* ---------- 主内容拉宽 ---------- */
+    #mc, #m_threads, #m_posts, .module_wrap, .w100, .forumbox, .contentBlock {
+        width: 100% !important;
+        max-width: none !important;
+        box-sizing: border-box !important;
+    }
+
+    #mc {
+        margin: 0 !important;
+        padding: 0 24px !important;
+    }
+
+    .topicrow .c1 { width: 70px !important; }
+    .topicrow .c2 { width: auto !important; }
+    .topicrow .c3 { width: 190px !important; }
+    .topicrow .c4 { width: 190px !important; }
+
     table, tr, td, th {
         background: transparent !important;
         border-color: ${COLORS.border} !important;
@@ -228,6 +245,33 @@
         background: #1177bb !important;
     }
 
+    /* ---------- 图片折叠 ---------- */
+    .vsc-img-hidden {
+        display: none !important;
+    }
+
+    .vsc-img-toggle {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-width: 180px;
+        padding: 10px 18px !important;
+        margin: 8px 0 !important;
+        background-color: #2d2d2d !important;
+        border: 1px dashed #555555 !important;
+        color: #858585 !important;
+        font-size: 13px !important;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+        cursor: pointer;
+        border-radius: 0 !important;
+    }
+
+    .vsc-img-toggle:hover {
+        background-color: #37373d !important;
+        border-color: ${COLORS.accent} !important;
+        color: ${COLORS.text} !important;
+    }
+
     /* ---------- 滚动条 ---------- */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: ${COLORS.bg}; }
@@ -286,6 +330,40 @@
     #vsc-tabs .vsc-tab-title {
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* ---------- 顶部站内搜索 ---------- */
+    #vsc-search-box {
+        position: absolute;
+        right: 12px;
+        top: 5px;
+        width: 320px;
+        height: 25px;
+        display: flex;
+        align-items: center;
+        z-index: 2;
+    }
+
+    #vsc-search-global {
+        width: 100%;
+        height: 24px;
+        box-sizing: border-box;
+        background: #3c3c3c !important;
+        border: 1px solid #3c3c3c !important;
+        color: ${COLORS.text} !important;
+        padding: 0 10px !important;
+        font-size: 12px !important;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+        outline: none !important;
+        border-radius: 2px !important;
+    }
+
+    #vsc-search-global::placeholder {
+        color: ${COLORS.muted} !important;
+    }
+
+    #vsc-search-global:focus {
+        border-color: ${COLORS.accent} !important;
     }
 
     /* ---------- 活动栏 ---------- */
@@ -460,12 +538,16 @@
 
     /* ===================== DOM 外壳 ===================== */
     function buildShell() {
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.2.0';
         const tabs = document.createElement('div');
         tabs.id = 'vsc-tabs';
         tabs.innerHTML = `
             <div class="vsc-tab active">
                 <span class="vsc-dot"></span>
                 <span class="vsc-tab-title">NGA</span>
+            </div>
+            <div id="vsc-search-box">
+                <input id="vsc-search-global" type="search" placeholder="搜索 NGA，回车跳转（按 / 聚焦）" spellcheck="false">
             </div>
         `;
 
@@ -498,9 +580,11 @@
             <div class="vsc-status-left">
                 <span class="vsc-status-item" id="vsc-status-branch">⑂ main</span>
                 <span class="vsc-status-item" id="vsc-status-count">0 楼层</span>
+                <span class="vsc-status-item" id="vsc-status-img">0 图已折叠</span>
                 <span class="vsc-status-item" id="vsc-status-tid"></span>
             </div>
             <div class="vsc-status-right">
+                <span class="vsc-status-item" id="vsc-status-ver">v${version}</span>
                 <span class="vsc-status-item">Ln 1, Col 1</span>
                 <span class="vsc-status-item">空格: 2</span>
                 <span class="vsc-status-item">UTF-8</span>
@@ -546,24 +630,35 @@
         return match ? match[1] : '';
     }
 
-    /* ===================== 楼层收集 ===================== */
+    /* ===================== 条目收集（楼层 / 帖子列表） ===================== */
     function collectFloors() {
-        if (!isThreadPage()) return [];
+        if (isThreadPage()) {
+            const selectors = [
+                '#postlist .postrow',
+                '#postlist > table',
+                '.postrow',
+                '[id^="post_"]',
+            ];
 
-        const selectors = [
-            '#postlist .postrow',
-            '#postlist > table',
-            '.postrow',
-            '[id^="post_"]',
-        ];
-
-        for (const sel of selectors) {
-            const nodes = Array.from(document.querySelectorAll(sel)).filter((el) => {
-                const rect = el.getBoundingClientRect();
-                return rect.height > 40;
-            });
-            if (nodes.length >= 2) return nodes;
+            for (const sel of selectors) {
+                const nodes = Array.from(document.querySelectorAll(sel)).filter((el) => {
+                    const rect = el.getBoundingClientRect();
+                    return rect.height > 40;
+                });
+                if (nodes.length >= 2) return nodes;
+            }
+            return [];
         }
+
+        // 版块列表页：每行是一个帖子
+        if (isForumPage()) {
+            const rows = Array.from(document.querySelectorAll('.topicrow')).filter((el) => {
+                const rect = el.getBoundingClientRect();
+                return rect.height > 10;
+            });
+            if (rows.length) return rows;
+        }
+
         return [];
     }
 
@@ -607,46 +702,75 @@
         const statusTid = document.getElementById('vsc-status-tid');
         if (!outline) return;
 
+        const isList = isForumPage();
         currentFloors = collectFloors();
         outline.innerHTML = '';
         activeIndex = -1;
 
+        const sidebarTitle = document.getElementById('vsc-sidebar-title');
+        if (sidebarTitle) sidebarTitle.textContent = isList ? '帖子目录' : '楼层目录';
+
         if (count) count.textContent = currentFloors.length ? String(currentFloors.length) : '';
-        if (statusCount) statusCount.textContent = `${currentFloors.length} 楼层`;
+        if (statusCount) statusCount.textContent = `${currentFloors.length} ${isList ? '帖子' : '楼层'}`;
 
         const tid = getTid();
         if (statusTid) statusTid.textContent = tid ? `tid=${tid}` : '';
 
         if (!currentFloors.length) {
-            outline.innerHTML = isThreadPage()
-                ? '<div class="vsc-empty">没有识别到楼层。<br>可能是未登录或页面结构变化。</div>'
-                : '<div class="vsc-empty">当前不是帖子页。<br>打开一个帖子后会显示楼层目录。</div>';
+            if (isThreadPage()) {
+                outline.innerHTML = '<div class="vsc-empty">没有识别到楼层。<br>可能是未登录或页面结构变化。</div>';
+            } else if (isList) {
+                outline.innerHTML = '<div class="vsc-empty">没有识别到帖子列表。</div>';
+            } else {
+                outline.innerHTML = '<div class="vsc-empty">当前页面没有可识别的条目。</div>';
+            }
             updateTabTitle();
             return;
         }
 
-        currentFloors.forEach((floor, index) => {
-            const floorNo = extractFloorNo(floor, index);
-            const author = extractAuthor(floor);
-            const label = `${floorNo}楼 · ${author}`;
-
+        currentFloors.forEach((item, index) => {
             const row = document.createElement('div');
             row.className = 'vsc-outline-item';
             row.dataset.index = String(index);
-            row.title = extractExcerpt(floor) || label;
-            row.innerHTML = `<span class="vsc-outline-index">${floorNo}</span><span class="vsc-outline-label"></span>`;
-            row.querySelector('.vsc-outline-label').textContent = author;
 
-            row.addEventListener('click', () => {
-                floor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                setActive(index);
-            });
+            if (isList) {
+                const link = item.querySelector('.topic');
+                const authorEl = item.querySelector('.author');
+                const repliesEl = item.querySelector('.replies');
+
+                const title = link
+                    ? link.textContent.replace(/\s+/g, ' ').trim()
+                    : `帖子 ${index + 1}`;
+                const author = authorEl ? authorEl.textContent.replace(/\s+/g, ' ').trim() : '';
+                const replies = repliesEl ? repliesEl.textContent.trim() : '';
+
+                row.title = [title, author, replies ? `${replies} 回复` : ''].filter(Boolean).join(' · ');
+                row.innerHTML = `<span class="vsc-outline-index">${replies || index + 1}</span><span class="vsc-outline-label"></span>`;
+                row.querySelector('.vsc-outline-label').textContent = title;
+
+                row.addEventListener('click', () => {
+                    if (link && link.href) window.location.href = link.href;
+                });
+            } else {
+                const floorNo = extractFloorNo(item, index);
+                const author = extractAuthor(item);
+                const label = `${floorNo}楼 · ${author}`;
+
+                row.title = extractExcerpt(item) || label;
+                row.innerHTML = `<span class="vsc-outline-index">${floorNo}</span><span class="vsc-outline-label"></span>`;
+                row.querySelector('.vsc-outline-label').textContent = author;
+
+                row.addEventListener('click', () => {
+                    item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActive(index);
+                });
+            }
 
             outline.appendChild(row);
         });
 
         updateTabTitle();
-        syncActiveOnScroll();
+        if (!isList) syncActiveOnScroll();
     }
 
     function updateTabTitle() {
@@ -686,6 +810,67 @@
             });
             if (bestIndex >= 0 && bestIndex !== activeIndex) setActive(bestIndex);
         });
+    }
+
+    /* ===================== 图片折叠 ===================== */
+    function setupImages() {
+        const scope = document.querySelector('#mc') || document.body;
+        if (!scope) return;
+
+        scope.querySelectorAll('img').forEach((img) => {
+            if (img.closest('[id^="vsc-"]')) return;
+            if (img.dataset.vscShown) return;
+            if (img.dataset.vscImgHandled) return;
+
+            // 跳过表情、头像、等级图标
+            if (img.classList.contains('smile')) return;
+            if (img.matches('.avatar, .Avatar')) return;
+            if (img.closest('.poster, .avatar, .Avatar, .author')) return;
+
+            const rect = img.getBoundingClientRect();
+            const rawWidth = Number(img.getAttribute('width') || 0);
+            const rawHeight = Number(img.getAttribute('height') || 0);
+            const width = rect.width || img.width || rawWidth || 0;
+            const height = rect.height || img.height || rawHeight || 0;
+
+            if (!width && !height) {
+                if (!img.complete) {
+                    img.addEventListener('load', () => setupImages(), { once: true });
+                }
+                return;
+            }
+
+            if (width < 60 && height < 60) return;
+
+            img.dataset.vscImgHandled = '1';
+            img.classList.add('vsc-img-hidden');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'vsc-img-toggle';
+            btn.textContent = '点击显示图片';
+
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const realSrc = img.dataset.original || img.dataset.src;
+                if (realSrc) img.src = realSrc;
+                img.dataset.vscShown = '1';
+                img.classList.remove('vsc-img-hidden');
+                btn.remove();
+            });
+
+            const parent = img.parentElement;
+            if (parent) {
+                parent.insertBefore(btn, img.nextSibling);
+            }
+        });
+
+        const imgStatus = document.getElementById('vsc-status-img');
+        if (imgStatus) {
+            const hiddenCount = scope.querySelectorAll('.vsc-img-hidden').length;
+            imgStatus.textContent = `${hiddenCount} 图已折叠`;
+        }
     }
 
     /* ===================== 交互绑定 ===================== */
@@ -751,6 +936,7 @@
             });
         });
 
+        // 侧边栏搜索：筛选目录
         const searchInput = document.getElementById('vsc-search-input');
         if (searchInput) {
             searchInput.addEventListener('input', () => {
@@ -761,6 +947,29 @@
                 });
             });
         }
+
+        // 顶部站内搜索
+        const globalSearch = document.getElementById('vsc-search-global');
+        if (globalSearch) {
+            globalSearch.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                const keyword = globalSearch.value.trim();
+                if (!keyword) return;
+                window.location.href = `https://bbs.nga.cn/thread.php?key=${encodeURIComponent(keyword)}&fid=-7`;
+            });
+        }
+
+        // 按 / 快速聚焦搜索框
+        window.addEventListener('keydown', (event) => {
+            if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+            const active = document.activeElement;
+            const tag = active && active.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+            const input = document.getElementById('vsc-search-global');
+            if (!input) return;
+            event.preventDefault();
+            input.focus();
+        });
 
         document.querySelectorAll('#vsc-tabs .vsc-tab').forEach((tab) => {
             tab.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -787,6 +996,7 @@
         const observer = new MutationObserver(() => {
             clearTimeout(timer);
             timer = setTimeout(() => {
+                setupImages();
                 updateTabTitle();
                 renderOutline();
             }, 700);
@@ -800,6 +1010,7 @@
 
         addStyle(CSS);
         buildShell();
+        setupImages();
         bindEvents();
         renderOutline();
         watchChanges();
