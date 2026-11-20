@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         知乎 → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.4.0
+// @version      0.5.0
 // @description  把知乎网页改造成 VS Code 深色编辑器界面：活动栏 + 回答目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://www.zhihu.com/*
@@ -458,6 +458,39 @@
         box-shadow: inset 0 1px 0 ${COLORS.accent};
     }
 
+    /* ---------- 顶部站内搜索 ---------- */
+    #vsc-search-box {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        min-width: 120px;
+        overflow: hidden;
+    }
+
+    #vsc-search-global {
+        width: 100%;
+        max-width: 420px;
+        height: 24px;
+        box-sizing: border-box;
+        background: #3c3c3c !important;
+        border: 1px solid #3c3c3c !important;
+        color: ${COLORS.text} !important;
+        padding: 0 10px !important;
+        font-size: 12px !important;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+        outline: none !important;
+        border-radius: 2px !important;
+    }
+
+    #vsc-search-global::placeholder {
+        color: ${COLORS.muted} !important;
+    }
+
+    #vsc-search-global:focus {
+        border-color: ${COLORS.accent} !important;
+    }
+
     /* ---------- 活动栏 ---------- */
     #vsc-activity {
         position: fixed;
@@ -644,6 +677,9 @@
                 <span class="vsc-dot"></span>
                 <span class="vsc-tab-title">知乎</span>
             </div>
+            <div id="vsc-search-box">
+                <input id="vsc-search-global" type="search" placeholder="搜索知乎，回车跳转（按 / 聚焦）" spellcheck="false">
+            </div>
         `;
 
         // 活动栏
@@ -672,7 +708,7 @@
         `;
 
         // 状态栏
-        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.4.0';
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.5.0';
         const statusbar = document.createElement('div');
         statusbar.id = 'vsc-statusbar';
         statusbar.innerHTML = `
@@ -917,6 +953,27 @@
         document.querySelectorAll('#vsc-tabs .vsc-tab').forEach((tab) => {
             tab.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
         });
+
+        // 顶部站内搜索
+        const globalSearch = document.getElementById('vsc-search-global');
+        if (globalSearch) {
+            globalSearch.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                const keyword = globalSearch.value.trim();
+                if (!keyword) return;
+                window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(keyword)}`;
+            });
+
+            // 按 / 快速聚焦搜索框
+            window.addEventListener('keydown', (event) => {
+                if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+                const active = document.activeElement;
+                const tag = active && active.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+                event.preventDefault();
+                globalSearch.focus();
+            });
+        }
 
         // 滚动同步
         window.addEventListener('scroll', syncActiveOnScroll, { passive: true });
