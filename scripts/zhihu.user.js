@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         知乎 → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.5.0
+// @version      0.5.1
 // @description  把知乎网页改造成 VS Code 深色编辑器界面：活动栏 + 回答目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://www.zhihu.com/*
@@ -460,12 +460,14 @@
 
     /* ---------- 顶部站内搜索 ---------- */
     #vsc-search-box {
-        flex: 1 1 auto;
+        position: absolute;
+        right: 12px;
+        top: 5px;
+        width: 320px;
+        height: 25px;
         display: flex;
         align-items: center;
-        padding: 0 12px;
-        min-width: 120px;
-        overflow: hidden;
+        z-index: 2;
     }
 
     #vsc-search-global {
@@ -702,13 +704,13 @@
                 <span class="vsc-sidebar-count" id="vsc-outline-count"></span>
             </div>
             <div id="vsc-search-wrap">
-                <input id="vsc-search-input" type="text" placeholder="筛选目录..." spellcheck="false">
+                <input id="vsc-search-input" type="text" placeholder="筛选目录，回车搜索知乎" spellcheck="false">
             </div>
             <div id="vsc-outline"></div>
         `;
 
         // 状态栏
-        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.5.0';
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.5.1';
         const statusbar = document.createElement('div');
         statusbar.id = 'vsc-statusbar';
         statusbar.innerHTML = `
@@ -937,7 +939,7 @@
             });
         });
 
-        // 搜索过滤
+        // 侧边栏搜索：输入时筛选目录，回车跳转知乎站内搜索
         const searchInput = document.getElementById('vsc-search-input');
         if (searchInput) {
             searchInput.addEventListener('input', () => {
@@ -946,6 +948,13 @@
                     const label = row.textContent.toLowerCase();
                     row.style.display = !keyword || label.includes(keyword) ? '' : 'none';
                 });
+            });
+
+            searchInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                const keyword = searchInput.value.trim();
+                if (!keyword) return;
+                window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(keyword)}`;
             });
         }
 
@@ -963,17 +972,19 @@
                 if (!keyword) return;
                 window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(keyword)}`;
             });
-
-            // 按 / 快速聚焦搜索框
-            window.addEventListener('keydown', (event) => {
-                if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
-                const active = document.activeElement;
-                const tag = active && active.tagName;
-                if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
-                event.preventDefault();
-                globalSearch.focus();
-            });
         }
+
+        // 按 / 快速聚焦搜索框（独立绑定，不依赖搜索框是否已取到）
+        window.addEventListener('keydown', (event) => {
+            if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+            const active = document.activeElement;
+            const tag = active && active.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+            const input = document.getElementById('vsc-search-global');
+            if (!input) return;
+            event.preventDefault();
+            input.focus();
+        });
 
         // 滚动同步
         window.addEventListener('scroll', syncActiveOnScroll, { passive: true });
