@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         知乎 → VS Code Style
 // @namespace    https://github.com/lvxingzhi/youhou
-// @version      0.3.0
+// @version      0.4.0
 // @description  把知乎网页改造成 VS Code 深色编辑器界面：活动栏 + 回答目录侧边栏 + 标签页 + 状态栏
 // @author       lvxingzhi
 // @match        *://www.zhihu.com/*
@@ -152,6 +152,9 @@
         box-sizing: border-box !important;
     }
 
+    #root .Topstory-container,
+    #root .Topstory-content,
+    #root .Topstory-mainColumnCard,
     #root .Topstory-mainColumn,
     #root .Question-mainColumn,
     #root .Question-main,
@@ -168,6 +171,10 @@
         max-width: none !important;
         flex: 1 1 auto !important;
         box-sizing: border-box !important;
+    }
+
+    #root .Topstory-mainColumn {
+        margin-right: 0 !important;
     }
 
     #root .Card,
@@ -665,7 +672,7 @@
         `;
 
         // 状态栏
-        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.3.0';
+        const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.4.0';
         const statusbar = document.createElement('div');
         statusbar.id = 'vsc-statusbar';
         statusbar.innerHTML = `
@@ -1011,6 +1018,7 @@
 
         root.querySelectorAll('img').forEach((img) => {
             if (img.closest('[id^="vsc-"]')) return;
+            if (img.closest('.HotItem-img')) return; // 热榜缩略图交给 setupHotItemImages
             if (img.dataset.vscShown) return;
             if (img.dataset.vscImgHandled) return;
 
@@ -1071,12 +1079,52 @@
             }
         });
 
-        // 状态栏显示折叠数量，便于确认功能是否运行
+        updateImageCount(root);
+    }
+
+    // 状态栏显示折叠数量，便于确认功能是否运行
+    function updateImageCount(root) {
         const imgStatus = document.getElementById('vsc-status-img');
-        if (imgStatus) {
-            const hiddenCount = root.querySelectorAll('.vsc-img-hidden').length;
-            imgStatus.textContent = `${hiddenCount} 图已折叠`;
-        }
+        if (!imgStatus) return;
+        const hiddenCount = root.querySelectorAll('.vsc-img-hidden').length;
+        imgStatus.textContent = `${hiddenCount} 图已折叠`;
+    }
+
+    /* ===================== 热榜缩略图 ===================== */
+    // 知乎热榜每条右侧是 <a class="HotItem-img"><img></a>，整块隐藏并插入按钮
+    function setupHotItemImages() {
+        const root = document.querySelector('#root') || document.body;
+        if (!root) return;
+
+        root.querySelectorAll('.HotItem').forEach((item) => {
+            if (item.dataset.vscHotHandled) return;
+
+            const link = item.querySelector('.HotItem-img');
+            if (!link) return;
+
+            item.dataset.vscHotHandled = '1';
+            link.classList.add('vsc-img-hidden');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'vsc-img-toggle';
+            btn.textContent = '点击显示图片';
+
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                link.classList.remove('vsc-img-hidden');
+                link.dataset.vscShown = '1';
+                btn.remove();
+            });
+
+            const parent = link.parentElement;
+            if (parent) {
+                parent.insertBefore(btn, link.nextSibling);
+            }
+        });
+
+        updateImageCount(root);
     }
 
     /* ===================== 强制拉宽主内容列 ===================== */
@@ -1117,6 +1165,7 @@
                 cleanupNoise();
                 forceWiden();
                 setupImages();
+                setupHotItemImages();
                 updateTabTitle();
                 renderOutline();
             }, 700);
@@ -1131,6 +1180,7 @@
                 cleanupNoise();
                 forceWiden();
                 setupImages();
+                setupHotItemImages();
                 renderOutline();
             }, 500);
         };
@@ -1152,6 +1202,7 @@
         cleanupNoise();
         forceWiden();
         setupImages();
+        setupHotItemImages();
         bindEvents();
         renderOutline();
         watchChanges();
